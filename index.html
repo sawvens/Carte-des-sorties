@@ -233,6 +233,9 @@
       color: var(--green);
       margin-top: 4px;
     }
+    .place-date.planned {
+      color: var(--accent);
+    }
     .place-link { font-size: 11px; color: var(--accent); text-decoration: none; font-weight: 600; }
     .place-actions {
       display: flex;
@@ -308,6 +311,11 @@
           </div>
         </div>
 
+        <div class="form-group" id="plannedGroup" style="display: none;">
+          <label>📅 Date prévue</label>
+          <input type="date" id="plannedDate">
+        </div>
+
         <div class="form-group" id="dateGroup" style="display: none;">
           <label>Date de visite</label>
           <input type="date" id="doneDate">
@@ -376,6 +384,7 @@
     function toggleDateInput() {
       const status = document.getElementById('status').value;
       document.getElementById('dateGroup').style.display = status === 'done' ? 'block' : 'none';
+      document.getElementById('plannedGroup').style.display = status === 'todo' ? 'block' : 'none';
       if (status === 'done' && !document.getElementById('doneDate').value) {
         document.getElementById('doneDate').value = new Date().toISOString().split('T')[0];
       }
@@ -467,6 +476,7 @@
       const type = document.getElementById('type').value;
       const status = document.getElementById('status').value;
       const date = document.getElementById('doneDate').value;
+      const plannedDate = document.getElementById('plannedDate').value;
       const address = document.getElementById('address').value.trim();
       const hours = document.getElementById('hours').value.trim();
       const price = document.getElementById('price').value.trim();
@@ -493,6 +503,7 @@
         id: editingId ?? Date.now(),
         name, type, status,
         date: status === 'done' ? date : null,
+        plannedDate: status === 'todo' ? plannedDate : null,
         address, hours, price, website, photo,
         lat, lng
       };
@@ -519,6 +530,7 @@
       document.getElementById('website').value = '';
       document.getElementById('photo').value = '';
       document.getElementById('coords').value = '';
+      document.getElementById('plannedDate').value = '';
       document.getElementById('status').value = 'todo';
       document.getElementById('type').selectedIndex = 0;
       toggleDateInput();
@@ -538,6 +550,7 @@
       document.getElementById('status').value = p.status;
       toggleDateInput();
       document.getElementById('doneDate').value = p.date || '';
+      document.getElementById('plannedDate').value = p.plannedDate || '';
       document.getElementById('hours').value = p.hours || '';
       document.getElementById('price').value = p.price || '';
       document.getElementById('website').value = p.website || '';
@@ -662,7 +675,7 @@
             ${p.hours ? `🕒 ${p.hours}<br>` : ''}
             ${p.price ? `💶 ${p.price}<br>` : ''}
             ${p.website ? `<a href="${p.website}" target="_blank" rel="noopener">🔗 Site web / Billets</a><br>` : ''}
-            ${p.status === 'done' ? '✅ Visité le ' + (p.date || 'Inconnue') : '⏳ À visiter'}
+            ${p.status === 'done' ? '✅ Visité le ' + (p.date || 'Inconnue') : ('⏳ À visiter' + (p.plannedDate ? ' — 📅 prévu le ' + p.plannedDate : ''))}
           </div>
         `;
         marker.bindPopup(popupContent);
@@ -682,6 +695,7 @@
             ${p.price ? `<div class="place-meta">💶 ${p.price}</div>` : ''}
             ${p.website ? `<a class="place-link" href="${p.website}" target="_blank" rel="noopener">🔗 Site web / Billets</a>` : ''}
             ${p.date ? `<div class="place-date">Visité le ${p.date}</div>` : ''}
+            ${p.plannedDate ? `<div class="place-date planned">📅 Prévu le ${p.plannedDate}</div>` : ''}
             <div class="place-actions">
               <button class="action-btn" onclick="map.flyTo([${p.lat}, ${p.lng}], 14)">🎯 Voir</button>
               <button class="action-btn" onclick="editPlace(${p.id})">✏️ Modifier</button>

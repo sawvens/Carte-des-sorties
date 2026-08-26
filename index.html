@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mes Lieux en France — Carnet de Voyage</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #3b82f6;
+      --green: #10b981;
+      --orange: #f59e0b;
+      --border: #e2e8f0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    header {
+      background: #0f172a;
+      color: white;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 18px; font-weight: 700; }
+    .layout {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 49px);
+      position: relative;
+    }
+    #map {
+      flex: 1;
+      height: 100%;
+      z-index: 1;
+    }
+    .sidebar {
+      width: 380px;
+      background: var(--card);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      z-index: 2;
+      overflow-y: auto;
+    }
+    .panel {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel h2 {
+      font-size: 15px;
+      margin-bottom: 12px;
+      color: #1e293b;
+    }
+    .form-group {
+      margin-bottom: 10px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+    }
+    .btn {
+      width: 100%;
+      padding: 10px;
+      background: var(--accent);
+      color: white;
+      border: 0;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .btn:hover { opacity: 0.9; }
+    .filter-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .tab {
+      flex: 1;
+      padding: 6px;
+      border: 1px solid var(--border);
+      background: #f1f5f9;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+    }
+    .tab.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+    .places-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 16px;
+    }
+    .place-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+      position: relative;
+    }
+    .place-card.done { border-left: 4px solid var(--green); }
+    .place-card.todo { border-left: 4px solid var(--orange); }
+    .place-header {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+    .place-type {
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .place-date {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--green);
+      margin-top: 4px;
+    }
+    .place-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .action-btn {
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: white;
+      cursor: pointer;
+    }
+    .action-btn.delete { color: #ef4444; }
+    @media(max-width: 768px) {
+      .layout { flex-direction: column; }
+      .sidebar { width: 100%; height: 50vh; }
+      #map { height: 50vh; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>📍 Mes Destinations & Visites en France</h1>
+    <div id="stats" style="font-size: 12px;">0 à faire · 0 fait</div>
+  </header>
+
+  <div class="layout">
+    <div id="map"></div>
+
+    <div class="sidebar">
+      <div class="panel">
+        <h2>Ajouter un lieu</h2>
+        <div class="form-group">
+          <label>Nom du lieu</label>
+          <input type="text" id="name" placeholder="Ex: Musée d'Orsay, Le Bouillon Chartier...">
+        </div>
+        <div class="form-group">
+          <label>Catégorie</label>
+          <select id="type">
+            <option value="🏛️ Musée / Monument">🏛️ Musée / Monument</option>
+            <option value="🍽️ Restaurant / Café">🍽️ Restaurant / Café</option>
+            <option value="🌲 Nature / Parc">🌲 Nature / Parc</option>
+            <option value="🏨 Hébergement">🏨 Hébergement</option>
+            <option value="✨ Autre">✨ Autre</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Statut</label>
+          <select id="status" onchange="toggleDateInput()">
+            <option value="todo">À faire</option>
+            <option value="done">Déjà fait</option>
+          </select>
+        </div>
+        <div class="form-group" id="dateGroup" style="display: none;">
+          <label>Date de visite</label>
+          <input type="date" id="doneDate">
+        </div>
+        <div class="form-group">
+          <label>Coordonnées (ou clique sur la carte)</label>
+          <input type="text" id="coords" placeholder="48.8566, 2.3522" readonly>
+        </div>
+        <button class="btn" onclick="savePlace()">Enregistrer le lieu</button>
+      </div>
+
+      <div class="panel" style="padding-bottom: 0;">
+        <div class="filter-tabs">
+          <div class="tab active" onclick="setFilter('all', this)">Tous</div>
+          <div class="tab" onclick="setFilter('todo', this)">À faire</div>
+          <div class="tab" onclick="setFilter('done', this)">Faits</div>
+        </div>
+      </div>
+
+      <div class="places-list" id="placesList"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([46.603354, 1.888334], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    let places = JSON.parse(localStorage.getItem('places_data') || '[]');
+    let currentFilter = 'all';
+    let tempMarker = null;
+    let markersLayer = L.layerGroup().addTo(map);
+
+    function toggleDateInput() {
+      const status = document.getElementById('status').value;
+      document.getElementById('dateGroup').style.display = status === 'done' ? 'block' : 'none';
+      if (status === 'done' && !document.getElementById('doneDate').value) {
+        document.getElementById('doneDate').value = new Date().toISOString().split('T')[0];
+      }
+    }
+
+    map.on('click', e => {
+      const { lat, lng } = e.latlng;
+      document.getElementById('coords').value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      if (tempMarker) map.removeLayer(tempMarker);
+      tempMarker = L.marker([lat, lng], { opacity: 0.7 }).addTo(map);
+    });
+
+    function savePlace() {
+      const name = document.getElementById('name').value.trim();
+      const type = document.getElementById('type').value;
+      const status = document.getElementById('status').value;
+      const date = document.getElementById('doneDate').value;
+      const coordsVal = document.getElementById('coords').value;
+
+      if (!name || !coordsVal) {
+        alert('Veuillez saisir un nom et cliquer sur la carte pour définir la position.');
+        return;
+      }
+
+      const [lat, lng] = coordsVal.split(',').map(n => parseFloat(n));
+
+      const newPlace = {
+        id: Date.now(),
+        name,
+        type,
+        status,
+        date: status === 'done' ? date : null,
+        lat,
+        lng
+      };
+
+      places.push(newPlace);
+      localStorage.setItem('places_data', JSON.stringify(places));
+
+      // Reset
+      document.getElementById('name').value = '';
+      document.getElementById('coords').value = '';
+      if (tempMarker) map.removeLayer(tempMarker);
+
+      render();
+    }
+
+    function toggleStatus(id) {
+      const p = places.find(x => x.id === id);
+      if (p) {
+        if (p.status === 'todo') {
+          p.status = 'done';
+          p.date = new Date().toISOString().split('T')[0];
+        } else {
+          p.status = 'todo';
+          p.date = null;
+        }
+        localStorage.setItem('places_data', JSON.stringify(places));
+        render();
+      }
+    }
+
+    function deletePlace(id) {
+      places = places.filter(x => x.id !== id);
+      localStorage.setItem('places_data', JSON.stringify(places));
+      render();
+    }
+
+    function setFilter(filter, el) {
+      currentFilter = filter;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      render();
+    }
+
+    function render() {
+      markersLayer.clearLayers();
+      const listContainer = document.getElementById('placesList');
+      listContainer.innerHTML = '';
+
+      const filtered = places.filter(p => {
+        if (currentFilter === 'all') return true;
+        return p.status === currentFilter;
+      });
+
+      const todoCount = places.filter(p => p.status === 'todo').length;
+      const doneCount = places.filter(p => p.status === 'done').length;
+      document.getElementById('stats').textContent = `${todoCount} à faire · ${doneCount} fait${doneCount > 1 ? 's' : ''}`;
+
+      filtered.forEach(p => {
+        // Marker Map
+        const color = p.status === 'done' ? '#10b981' : '#f59e0b';
+        const marker = L.circleMarker([p.lat, p.lng], {
+          radius: 8,
+          fillColor: color,
+          color: '#ffffff',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.9
+        }).addTo(markersLayer);
+
+        const popupContent = `
+          <b>${p.name}</b><br>
+          ${p.type}<br>
+          ${p.status === 'done' ? '✅ Visité le ' + (p.date || 'Inconnue') : '⏳ À visiter'}
+        `;
+        marker.bindPopup(popupContent);
+
+        // Card Sidebar
+        const card = document.createElement('div');
+        card.className = `place-card ${p.status}`;
+        card.innerHTML = `
+          <div class="place-header">
+            <span>${p.name}</span>
+            <span style="font-size:12px">${p.status === 'done' ? '✅ Fait' : '⏳ À faire'}</span>
+          </div>
+          <div class="place-type">${p.type}</div>
+          ${p.date ? `<div class="place-date">Visité le ${p.date}</div>` : ''}
+          <div class="place-actions">
+            <button class="action-btn" onclick="map.flyTo([${p.lat}, ${p.lng}], 13)">🎯 Voir</button>
+            <button class="action-btn" onclick="toggleStatus(${p.id})">${p.status === 'done' ? 'Passer à faire' : 'Marquer comme fait'}</button>
+            <button class="action-btn delete" onclick="deletePlace(${p.id})">Supprimer</button>
+          </div>
+        `;
+        listContainer.appendChild(card);
+      });
+    }
+
+    render();
+  </script>
+</body>
+</html>

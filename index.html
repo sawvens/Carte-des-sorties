@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mes Lieux en France — Carnet de Voyage</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #3b82f6;
+      --green: #10b981;
+      --orange: #f59e0b;
+      --red: #ef4444;
+      --border: #e2e8f0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    header {
+      background: #0f172a;
+      color: white;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 18px; font-weight: 700; }
+    header .actions { display: flex; gap: 8px; align-items: center; }
+    header .icon-btn {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    header .icon-btn:hover { background: rgba(255,255,255,0.2); }
+    .layout {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 49px);
+      position: relative;
+    }
+    #map {
+      flex: 1;
+      height: 100%;
+      z-index: 1;
+    }
+    .sidebar {
+      width: 400px;
+      background: var(--card);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      z-index: 2;
+      overflow-y: auto;
+    }
+    .panel {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel h2 {
+      font-size: 15px;
+      margin-bottom: 12px;
+      color: #1e293b;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .panel h2 .cancel-edit {
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--accent);
+      cursor: pointer;
+    }
+    .form-group {
+      margin-bottom: 10px;
+      position: relative;
+    }
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+      font-family: inherit;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      border-color: var(--accent);
+    }
+    .form-row { display: flex; gap: 8px; }
+    .form-row .form-group { flex: 1; }
+    .autocomplete-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 20;
+      margin-top: 2px;
+    }
+    .autocomplete-item {
+      padding: 8px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+    }
+    .autocomplete-item:last-child { border-bottom: none; }
+    .autocomplete-item:hover { background: #f1f5f9; }
+    .autocomplete-item b { display: block; font-size: 12.5px; }
+    .autocomplete-item span { color: var(--muted); font-size: 11px; }
+    .autocomplete-loading { padding: 8px 10px; font-size: 12px; color: var(--muted); }
+    .btn {
+      width: 100%;
+      padding: 10px;
+      background: var(--accent);
+      color: white;
+      border: 0;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn.secondary {
+      background: #f1f5f9;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+    .filter-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .tab {
+      flex: 1;
+      padding: 6px;
+      border: 1px solid var(--border);
+      background: #f1f5f9;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+    }
+    .tab.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+    .search-box input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+    .places-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 16px;
+      padding-top: 0;
+    }
+    .place-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+      position: relative;
+      display: flex;
+      gap: 10px;
+    }
+    .place-card.done { border-left: 4px solid var(--green); }
+    .place-card.todo { border-left: 4px solid var(--orange); }
+    .place-photo {
+      width: 60px;
+      height: 60px;
+      border-radius: 8px;
+      object-fit: cover;
+      flex-shrink: 0;
+      background: #f1f5f9;
+    }
+    .place-body { flex: 1; min-width: 0; }
+    .place-header {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 2px;
+      gap: 6px;
+    }
+    .place-header span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .place-type {
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .place-address { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .place-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .place-date {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--green);
+      margin-top: 4px;
+    }
+    .place-link { font-size: 11px; color: var(--accent); text-decoration: none; font-weight: 600; }
+    .place-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .action-btn {
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: white;
+      cursor: pointer;
+    }
+    .action-btn.delete { color: var(--red); }
+    .empty-state { padding: 20px; text-align: center; color: var(--muted); font-size: 12px; }
+    @media(max-width: 768px) {
+      .layout { flex-direction: column; }
+      .sidebar { width: 100%; height: 55vh; }
+      #map { height: 45vh; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>📍 Mes Destinations & Visites en France</h1>
+    <div class="actions">
+      <span id="stats" style="font-size: 12px;">0 à faire · 0 fait</span>
+      <button class="icon-btn" onclick="exportData()">⬇️ Exporter</button>
+      <button class="icon-btn" onclick="document.getElementById('importFile').click()">⬆️ Importer</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+    </div>
+  </header>
+
+  <div class="layout">
+    <div id="map"></div>
+
+    <div class="sidebar">
+      <div class="panel">
+        <h2><span id="formTitle">Ajouter un lieu</span><span class="cancel-edit" id="cancelEdit" style="display:none" onclick="resetForm()">Annuler modif.</span></h2>
+
+        <div class="form-group">
+          <label>Nom du lieu</label>
+          <input type="text" id="name" placeholder="Ex: Musée d'Orsay, Le Bouillon Chartier...">
+        </div>
+
+        <div class="form-group">
+          <label>Adresse (tape pour voir des suggestions)</label>
+          <input type="text" id="address" placeholder="Commence à écrire une adresse ou un nom de lieu..." autocomplete="off">
+          <div class="autocomplete-list" id="autocompleteList" style="display:none;"></div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Catégorie</label>
+            <select id="type">
+              <option value="🏛️ Musée / Monument">🏛️ Musée / Monument</option>
+              <option value="🍽️ Restaurant / Café">🍽️ Restaurant / Café</option>
+              <option value="🌲 Nature / Parc">🌲 Nature / Parc</option>
+              <option value="🏨 Hébergement">🏨 Hébergement</option>
+              <option value="🧳 Séjours">🧳 Séjours</option>
+              <option value="✨ Autre">✨ Autre</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Statut</label>
+            <select id="status" onchange="toggleDateInput()">
+              <option value="todo">À faire</option>
+              <option value="done">Déjà fait</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group" id="dateGroup" style="display: none;">
+          <label>Date de visite</label>
+          <input type="date" id="doneDate">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Horaires</label>
+            <input type="text" id="hours" placeholder="Ex: 9h-18h, fermé lundi">
+          </div>
+          <div class="form-group">
+            <label>Prix</label>
+            <input type="text" id="price" placeholder="Ex: 12€, gratuit">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Site web (réservation / billets)</label>
+          <input type="url" id="website" placeholder="https://...">
+        </div>
+
+        <div class="form-group">
+          <label>Photo (URL image, optionnel)</label>
+          <input type="url" id="photo" placeholder="https://... (laisse vide pour essayer une photo automatique)">
+        </div>
+
+        <div class="form-group">
+          <label>Coordonnées (auto ou clique sur la carte)</label>
+          <input type="text" id="coords" placeholder="48.8566, 2.3522" readonly>
+        </div>
+
+        <button class="btn" onclick="savePlace()" id="saveBtn">Enregistrer le lieu</button>
+        <div class="hint">Astuce : choisis une adresse dans les suggestions pour remplir automatiquement les coordonnées, ou clique directement sur la carte.</div>
+      </div>
+
+      <div class="panel" style="padding-bottom: 0;">
+        <div class="filter-tabs">
+          <div class="tab active" onclick="setFilter('all', this)">Tous</div>
+          <div class="tab" onclick="setFilter('todo', this)">À faire</div>
+          <div class="tab" onclick="setFilter('done', this)">Faits</div>
+        </div>
+        <div class="search-box">
+          <input type="text" id="searchBox" placeholder="🔎 Rechercher dans mes lieux..." oninput="render()">
+        </div>
+      </div>
+
+      <div class="places-list" id="placesList"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([46.603354, 1.888334], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    let places = JSON.parse(localStorage.getItem('places_data') || '[]');
+    let currentFilter = 'all';
+    let tempMarker = null;
+    let markersLayer = L.layerGroup().addTo(map);
+    let editingId = null;
+    let selectedAddressCoords = null; // {lat, lng} from autocomplete selection
+    let acDebounce = null;
+
+    function toggleDateInput() {
+      const status = document.getElementById('status').value;
+      document.getElementById('dateGroup').style.display = status === 'done' ? 'block' : 'none';
+      if (status === 'done' && !document.getElementById('doneDate').value) {
+        document.getElementById('doneDate').value = new Date().toISOString().split('T')[0];
+      }
+    }
+
+    // ---- Autocomplete d'adresse via Nominatim (OpenStreetMap) ----
+    const addressInput = document.getElementById('address');
+    const acList = document.getElementById('autocompleteList');
+
+    addressInput.addEventListener('input', () => {
+      const q = addressInput.value.trim();
+      selectedAddressCoords = null;
+      clearTimeout(acDebounce);
+      if (q.length < 3) {
+        acList.style.display = 'none';
+        return;
+      }
+      acList.innerHTML = '<div class="autocomplete-loading">Recherche...</div>';
+      acList.style.display = 'block';
+      acDebounce = setTimeout(() => fetchAddressSuggestions(q), 450);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!acList.contains(e.target) && e.target !== addressInput) {
+        acList.style.display = 'none';
+      }
+    });
+
+    async function fetchAddressSuggestions(query) {
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=fr&q=${encodeURIComponent(query)}`;
+        const res = await fetch(url, { headers: { 'Accept-Language': 'fr' } });
+        const data = await res.json();
+        if (!data.length) {
+          acList.innerHTML = '<div class="autocomplete-loading">Aucun résultat</div>';
+          return;
+        }
+        acList.innerHTML = '';
+        data.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'autocomplete-item';
+          const mainName = item.display_name.split(',')[0];
+          div.innerHTML = `<b>${mainName}</b><span>${item.display_name}</span>`;
+          div.onclick = () => {
+            addressInput.value = item.display_name;
+            selectedAddressCoords = { lat: parseFloat(item.lat), lng: parseFloat(item.lon) };
+            document.getElementById('coords').value = `${item.lat.slice(0,7)}, ${item.lon.slice(0,7)}`;
+            if (tempMarker) map.removeLayer(tempMarker);
+            tempMarker = L.marker([item.lat, item.lon], { opacity: 0.7 }).addTo(map);
+            map.flyTo([item.lat, item.lon], 14);
+            if (!document.getElementById('name').value.trim()) {
+              document.getElementById('name').value = mainName;
+            }
+            acList.style.display = 'none';
+          };
+          acList.appendChild(div);
+        });
+      } catch (err) {
+        acList.innerHTML = '<div class="autocomplete-loading">Erreur de recherche (hors-ligne ?)</div>';
+      }
+    }
+
+    // Clic direct sur la carte = choix manuel des coordonnées
+    map.on('click', e => {
+      const { lat, lng } = e.latlng;
+      document.getElementById('coords').value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      selectedAddressCoords = { lat, lng };
+      if (tempMarker) map.removeLayer(tempMarker);
+      tempMarker = L.marker([lat, lng], { opacity: 0.7 }).addTo(map);
+    });
+
+    // ---- Photo automatique (best effort) via Wikipedia ----
+    async function tryFetchWikiPhoto(name) {
+      try {
+        const url = `https://fr.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages&piprop=thumbnail&pithumbsize=300&generator=search&gsrsearch=${encodeURIComponent(name)}&gsrlimit=1&origin=*`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const pages = data?.query?.pages;
+        if (pages) {
+          const page = Object.values(pages)[0];
+          if (page?.thumbnail?.source) return page.thumbnail.source;
+        }
+      } catch (err) { /* silencieux, best effort */ }
+      return '';
+    }
+
+    async function savePlace() {
+      const name = document.getElementById('name').value.trim();
+      const type = document.getElementById('type').value;
+      const status = document.getElementById('status').value;
+      const date = document.getElementById('doneDate').value;
+      const address = document.getElementById('address').value.trim();
+      const hours = document.getElementById('hours').value.trim();
+      const price = document.getElementById('price').value.trim();
+      const website = document.getElementById('website').value.trim();
+      let photo = document.getElementById('photo').value.trim();
+      const coordsVal = document.getElementById('coords').value;
+
+      if (!name || !coordsVal) {
+        alert('Veuillez saisir un nom et une position (choisis une suggestion d\'adresse ou clique sur la carte).');
+        return;
+      }
+
+      const [lat, lng] = coordsVal.split(',').map(n => parseFloat(n));
+
+      const saveBtn = document.getElementById('saveBtn');
+      if (!photo) {
+        saveBtn.textContent = 'Recherche photo...';
+        saveBtn.disabled = true;
+        photo = await tryFetchWikiPhoto(name);
+        saveBtn.disabled = false;
+      }
+
+      const placeData = {
+        id: editingId ?? Date.now(),
+        name, type, status,
+        date: status === 'done' ? date : null,
+        address, hours, price, website, photo,
+        lat, lng
+      };
+
+      if (editingId) {
+        const idx = places.findIndex(p => p.id === editingId);
+        if (idx !== -1) places[idx] = placeData;
+      } else {
+        places.push(placeData);
+      }
+      localStorage.setItem('places_data', JSON.stringify(places));
+
+      resetForm();
+      render();
+    }
+
+    function resetForm() {
+      editingId = null;
+      selectedAddressCoords = null;
+      document.getElementById('name').value = '';
+      document.getElementById('address').value = '';
+      document.getElementById('hours').value = '';
+      document.getElementById('price').value = '';
+      document.getElementById('website').value = '';
+      document.getElementById('photo').value = '';
+      document.getElementById('coords').value = '';
+      document.getElementById('status').value = 'todo';
+      document.getElementById('type').selectedIndex = 0;
+      toggleDateInput();
+      document.getElementById('formTitle').textContent = 'Ajouter un lieu';
+      document.getElementById('cancelEdit').style.display = 'none';
+      document.getElementById('saveBtn').textContent = 'Enregistrer le lieu';
+      if (tempMarker) { map.removeLayer(tempMarker); tempMarker = null; }
+    }
+
+    function editPlace(id) {
+      const p = places.find(x => x.id === id);
+      if (!p) return;
+      editingId = id;
+      document.getElementById('name').value = p.name;
+      document.getElementById('address').value = p.address || '';
+      document.getElementById('type').value = p.type;
+      document.getElementById('status').value = p.status;
+      toggleDateInput();
+      document.getElementById('doneDate').value = p.date || '';
+      document.getElementById('hours').value = p.hours || '';
+      document.getElementById('price').value = p.price || '';
+      document.getElementById('website').value = p.website || '';
+      document.getElementById('photo').value = p.photo || '';
+      document.getElementById('coords').value = `${p.lat}, ${p.lng}`;
+      document.getElementById('formTitle').textContent = 'Modifier le lieu';
+      document.getElementById('cancelEdit').style.display = 'inline';
+      document.getElementById('saveBtn').textContent = 'Mettre à jour';
+      if (tempMarker) map.removeLayer(tempMarker);
+      tempMarker = L.marker([p.lat, p.lng], { opacity: 0.7 }).addTo(map);
+      map.flyTo([p.lat, p.lng], 14);
+      window.scrollTo(0, 0);
+      document.querySelector('.sidebar').scrollTop = 0;
+    }
+
+    function toggleStatus(id) {
+      const p = places.find(x => x.id === id);
+      if (p) {
+        if (p.status === 'todo') {
+          p.status = 'done';
+          p.date = new Date().toISOString().split('T')[0];
+        } else {
+          p.status = 'todo';
+          p.date = null;
+        }
+        localStorage.setItem('places_data', JSON.stringify(places));
+        render();
+      }
+    }
+
+    function deletePlace(id) {
+      if (!confirm('Supprimer ce lieu définitivement ?')) return;
+      places = places.filter(x => x.id !== id);
+      localStorage.setItem('places_data', JSON.stringify(places));
+      render();
+    }
+
+    function setFilter(filter, el) {
+      currentFilter = filter;
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      el.classList.add('active');
+      render();
+    }
+
+    function exportData() {
+      const blob = new Blob([JSON.stringify(places, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `mes-lieux-france-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (!Array.isArray(imported)) throw new Error('Format invalide');
+          const merge = confirm('OK = fusionner avec les lieux existants.\nAnnuler = remplacer complètement la liste actuelle.');
+          if (merge) {
+            const existingIds = new Set(places.map(p => p.id));
+            imported.forEach(p => { if (!existingIds.has(p.id)) places.push(p); });
+          } else {
+            places = imported;
+          }
+          localStorage.setItem('places_data', JSON.stringify(places));
+          render();
+          alert(`${imported.length} lieu(x) importé(s).`);
+        } catch (err) {
+          alert('Fichier invalide.');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    function render() {
+      markersLayer.clearLayers();
+      const listContainer = document.getElementById('placesList');
+      listContainer.innerHTML = '';
+
+      const search = (document.getElementById('searchBox')?.value || '').toLowerCase().trim();
+
+      const filtered = places.filter(p => {
+        const statusMatch = currentFilter === 'all' || p.status === currentFilter;
+        const searchMatch = !search ||
+          p.name.toLowerCase().includes(search) ||
+          (p.address || '').toLowerCase().includes(search) ||
+          (p.type || '').toLowerCase().includes(search);
+        return statusMatch && searchMatch;
+      });
+
+      const todoCount = places.filter(p => p.status === 'todo').length;
+      const doneCount = places.filter(p => p.status === 'done').length;
+      document.getElementById('stats').textContent = `${todoCount} à faire · ${doneCount} fait${doneCount > 1 ? 's' : ''}`;
+
+      if (!filtered.length) {
+        listContainer.innerHTML = '<div class="empty-state">Aucun lieu pour l\'instant. Ajoute ton premier lieu ci-dessus 👆</div>';
+      }
+
+      filtered.forEach(p => {
+        const color = p.status === 'done' ? '#10b981' : '#f59e0b';
+        const marker = L.circleMarker([p.lat, p.lng], {
+          radius: 8,
+          fillColor: color,
+          color: '#ffffff',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.9
+        }).addTo(markersLayer);
+
+        const popupContent = `
+          <div style="max-width:220px">
+            ${p.photo ? `<img src="${p.photo}" style="width:100%;height:100px;object-fit:cover;border-radius:6px;margin-bottom:6px" onerror="this.style.display='none'">` : ''}
+            <b>${p.name}</b><br>
+            <span style="color:#64748b;font-size:12px">${p.type}</span><br>
+            ${p.address ? `<span style="font-size:11px">${p.address}</span><br>` : ''}
+            ${p.hours ? `🕒 ${p.hours}<br>` : ''}
+            ${p.price ? `💶 ${p.price}<br>` : ''}
+            ${p.website ? `<a href="${p.website}" target="_blank" rel="noopener">🔗 Site web / Billets</a><br>` : ''}
+            ${p.status === 'done' ? '✅ Visité le ' + (p.date || 'Inconnue') : '⏳ À visiter'}
+          </div>
+        `;
+        marker.bindPopup(popupContent);
+
+        const card = document.createElement('div');
+        card.className = `place-card ${p.status}`;
+        card.innerHTML = `
+          ${p.photo ? `<img class="place-photo" src="${p.photo}" onerror="this.style.display='none'">` : ''}
+          <div class="place-body">
+            <div class="place-header">
+              <span>${p.name}</span>
+              <span style="font-size:12px;flex-shrink:0">${p.status === 'done' ? '✅' : '⏳'}</span>
+            </div>
+            <div class="place-type">${p.type}</div>
+            ${p.address ? `<div class="place-address">📍 ${p.address}</div>` : ''}
+            ${p.hours ? `<div class="place-meta">🕒 ${p.hours}</div>` : ''}
+            ${p.price ? `<div class="place-meta">💶 ${p.price}</div>` : ''}
+            ${p.website ? `<a class="place-link" href="${p.website}" target="_blank" rel="noopener">🔗 Site web / Billets</a>` : ''}
+            ${p.date ? `<div class="place-date">Visité le ${p.date}</div>` : ''}
+            <div class="place-actions">
+              <button class="action-btn" onclick="map.flyTo([${p.lat}, ${p.lng}], 14)">🎯 Voir</button>
+              <button class="action-btn" onclick="editPlace(${p.id})">✏️ Modifier</button>
+              <button class="action-btn" onclick="toggleStatus(${p.id})">${p.status === 'done' ? 'Passer à faire' : 'Marquer fait'}</button>
+              <button class="action-btn delete" onclick="deletePlace(${p.id})">🗑️ Supprimer</button>
+            </div>
+          </div>
+        `;
+        listContainer.appendChild(card);
+      });
+    }
+
+    render();
+  </script>
+</body>
+</html>
